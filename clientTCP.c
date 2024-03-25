@@ -1,52 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <unistd.h>
 #include <arpa/inet.h>
-#include <netdb.h>
+#include <sys/socket.h>
+
+#define PORT 8080
 
 int main() {
-    int sockfd;
     struct sockaddr_in serv_addr;
-    struct hostent *server;
+    char buffer[1024] = {0};
+    int sock = 0;
 
-    // Nom d'hôte ou adresse IP du serveur
-    char *server_name = "localhost";
-
-    // Numéro de port du serveur
-    int portno = 8080;
-
-    // Création d'une socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("\n Socket creation error \n");
+        return -1;
     }
 
-    // Récupération de l'adresse IP du serveur
-    server = gethostbyname(server_name);
-    if (server == NULL) {
-        fprintf(stderr, "ERROR, no such host\n");
-        exit(0);
-    }
-
-    // Configuration de l'adresse du serveur
-    bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
-    serv_addr.sin_port = htons(portno);
+    serv_addr.sin_port = htons(PORT);
 
-    // Connexion au serveur
-    if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        perror("ERROR connecting");
-        exit(1);
+    // Convertir l'adresse IPv4 et IPv6 de texte à binaire
+    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+        printf("\nInvalid address/ Address not supported \n");
+        return -1;
     }
 
-    // Échange de données avec le serveur
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("\nConnection Failed \n");
+        return -1;
+    }
 
-    // Fermeture de la connexion
-    close(sockfd);
+    // Envoie des messages de manière répétée
+    while(1) {
+        printf("Vous: ");
+        fgets(buffer, 1024, stdin);
+        buffer[strcspn(buffer, "\n")] = 0; // Enlever le newline du buffer
+        send(sock, buffer, strlen(buffer), 0);
+        
+        if(strcmp(buffer, "fin") == 0) break; // Si le message est "fin", termine la boucle.
+    }
 
+    close(sock);
     return 0;
 }
