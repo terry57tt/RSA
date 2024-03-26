@@ -41,7 +41,6 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Recevoir des messages de manière répétée
     while(1) {
         memset(buffer, 0, sizeof(buffer)); // Nettoyer le buffer
         int valread = read(new_socket, buffer, 1024);
@@ -50,6 +49,11 @@ int main() {
             break;
         }
         printf("Client : %s\n",buffer);
+
+        // Envoyer une réponse au client
+        char *response = "Message reçu par le serveur.";
+        send(new_socket, response, strlen(response), 0);
+
         if(strcmp(buffer, "fin") == 0) break; // Si le message est "fin", arrêtez le serveur.
     }
 
