@@ -4,10 +4,37 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <stdbool.h>
 
 #define PORT 8080
 
-int displayMenu(char *buffer) {
+// vérifie la validité de l'adresse IP
+bool check_ip_address(char *ip_address) {
+    char *ip_copy = malloc(strlen(ip_address) + 1); // copy
+    strcpy(ip_copy, ip_address);
+
+    char *token = strtok(ip_copy, ".");
+    int i = 0;
+    while(token != NULL) {
+        int num = atoi(token);
+        if(num < 0 || num > 255) {
+            free(ip_copy);
+            return false;
+        }
+        token = strtok(NULL, ".");
+        i++;
+    }
+    if(i != 4) {
+        free(ip_copy);
+        return false;
+    }
+
+    free(ip_copy);
+    return true;
+}
+
+// Afficher le menu (true si on doit envoyer un message, false sinon (commande locale))
+bool displayMenu(char *buffer, char *ip_address, int sock) {
     printf("Menu:\n");
     printf("1. Scan horizontal\n");
     printf("2. Scan vertical\n");
@@ -19,21 +46,34 @@ int displayMenu(char *buffer) {
 
     switch(atoi(buffer)) {
         case 1:
-            return 1;
+            strcpy(buffer, "1");
+            return true;
         case 2:
-            return 2;
+            printf("Entrez l'adresse IP : "); // demander l'adresse IP à l'utilisateur
+            fgets(ip_address, 1024, stdin);
+
+            if (check_ip_address(ip_address)){
+                ip_address[strcspn(ip_address, "\n")] = 0; // Enlever le newline de l'adresse IP
+                // buffer prend 2, suivi de l'adresse IP
+                strcpy(buffer, "2");
+                strcat(buffer, ip_address);
+                return true;
+            } else {
+                printf("Adresse IP invalide (format : xxx.xxx.xxx.xxx).\n");
+                return false;
+            }
         case 3:
             printf("\nScan horizontal: Scanne les ports d'une adresse IP donnée.\n");
             printf("Scan vertical: Scanne les ports d'une adresse IP donnée.\n");
             printf("Help: Affiche le menu.\n");
             printf("Quitter: Quitte le programme.\n\n");
-            break;
+            return false;
         case 4:
-            strcpy(buffer, "fin");
-            break;
+            close(sock);
+            return true;
         default:
             printf("Commande invalide.\n");
-            break;
+            return false;
     }
 }
 
@@ -61,24 +101,25 @@ int main() {
         return -1;
     }
 
-    // Envoie des messages de manière répétée
+    // debut de la conversation
     while(1) {
-        displayMenu(buffer);
-        
-        send(sock, buffer, strlen(buffer), 0);
-        
-        if(strcmp(buffer, "fin") == 0) break; // Si le message est "fin", termine la boucle.
+        char* ip_address = malloc(1024);
 
-        // Recevoir la réponse du serveur
-        memset(buffer, 0, sizeof(buffer)); // Nettoyer le buffer
-        int valread = read(sock, buffer, 1024);
-        if(valread <= 0) {
-            printf("Connexion fermée par le serveur.\n");
-            break;
+        if(displayMenu(buffer,ip_address,sock)) { // afficher le menu
+            send(sock, buffer, strlen(buffer), 0); // envoi de la requête au serveur
+
+            memset(buffer, 0, sizeof(buffer)); // clear buffer
+            int valread = read(sock, buffer, 1024); // attendre la réponse du serveur
+            if(valread <= 0) {
+                printf("Connexion fermée par le serveur.\n");
+                break;
+            }
+            printf("Serveur : %s\n", buffer);
         }
-        printf("Serveur : %s\n", buffer);
+    
+        free(ip_address);        
     }
 
     close(sock);
-    return 0;
+    return EXIT_SUCCESS;
 }
