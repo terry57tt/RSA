@@ -10,27 +10,10 @@
 
 // vérifie la validité de l'adresse IP
 bool check_ip_address(char *ip_address) {
-    char *ip_copy = malloc(strlen(ip_address) + 1); // copy
-    strcpy(ip_copy, ip_address);
-
-    char *token = strtok(ip_copy, ".");
-    int i = 0;
-    while(token != NULL) {
-        int num = atoi(token);
-        if(num < 0 || num > 255) {
-            free(ip_copy);
-            return false;
-        }
-        token = strtok(NULL, ".");
-        i++;
-    }
-    if(i != 4) {
-        free(ip_copy);
-        return false;
-    }
-
-    free(ip_copy);
-    return true;
+    ip_address[strcspn(ip_address, "\n")] = 0;
+    struct in_addr addr;
+    int valid = inet_pton(AF_INET, ip_address, &addr);
+    return valid != 0;
 }
 
 // Afficher le menu (true si on doit envoyer un message, false sinon (commande locale))
@@ -40,6 +23,7 @@ bool displayMenu(char *buffer, char *ip_address, int sock) {
     printf("2. Scan vertical\n");
     printf("3. Help\n");
     printf("4. Quitter\n");
+
 
     fgets(buffer, 1024, stdin);
     buffer[strcspn(buffer, "\n")] = 0; // Enlever le newline du buffer
@@ -53,7 +37,6 @@ bool displayMenu(char *buffer, char *ip_address, int sock) {
             fgets(ip_address, 1024, stdin);
 
             if (check_ip_address(ip_address)){
-                ip_address[strcspn(ip_address, "\n")] = 0; // Enlever le newline de l'adresse IP
                 // buffer prend 2, suivi de l'adresse IP
                 strcpy(buffer, "2");
                 strcat(buffer, ip_address);
