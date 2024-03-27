@@ -18,89 +18,75 @@ typedef struct {
     bool is_open;
 } port_info;
 
-void scan_vertical(char *ip_address, int start_port, int end_port, char *buffer) {
-    struct sockaddr_in sock_addr;
-    socklen_t sock_addr_len = sizeof(sock_addr);
+void scan_vertical_UDP(char *ip_address, int start_port, int end_port, char *buffer) {
+    struct sockaddr_in sock_addr, src_addr;
+    socklen_t sock_addr_len = sizeof(sock_addr), src_addr_len = sizeof(src_addr);
     port_info results[1024] = {0};
     buffer[0] = '\0'; // Initialiser la chaîne de caractères
     bool too_long = false;
 
+    int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // Utiliser SOCK_DGRAM pour UDP
+    if (sockfd < 0) {
+        perror("ERROR opening socket");
+        exit(1);
+    }
+
     for (int i = start_port; i <= end_port; i++) {
-        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd < 0) {
-            perror("ERROR opening socket");
-            exit(1);
-        }
-
-        // Set the socket to non-blocking mode
-        int flags = fcntl(sockfd, F_GETFL, 0);
-        fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-
         sock_addr.sin_family = AF_INET;
         sock_addr.sin_port = htons(i);
         inet_pton(AF_INET, ip_address, &sock_addr.sin_addr);
 
-        // Attempt to connect
-        if (connect(sockfd, (struct sockaddr *)&sock_addr, sock_addr_len) == -1 && errno != EINPROGRESS) {
-            // Handle error
-            perror("ERROR connecting to socket");
-            close(sockfd);
+        // Envoyer un datagramme vide
+        char empty_datagram[1] = {0};
+        if (sendto(sockfd, empty_datagram, sizeof(empty_datagram), 0, (struct sockaddr *)&sock_addr, sock_addr_len) < 0) {
+            perror("ERROR sending datagram");
             continue;
         }
 
-        fd_set writefds;
+        // Réinitialiser le timeout
         struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 5000;
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-        timeout.tv_sec = 0; // en secondes
-        timeout.tv_usec = 50; // en microsecondes
+        char recv_buffer[1024];
+        ssize_t recv_len = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, (struct sockaddr *)&src_addr, &src_addr_len);
 
-        // Start the timer
-        FD_ZERO(&writefds);
-        FD_SET(sockfd, &writefds);
-        int select_result = select(sockfd + 1, NULL, &writefds, NULL, &timeout);
-        if (select_result == -1) {
-            perror("Select error");
-            close(sockfd);
-            continue;
-        } else if (select_result == 0) {
-            // Timeout occurred (en général, ca signifie adresse IP invalide)
-            too_long = true;
-            close(sockfd);
-            continue;
-        }
-
-        int error;
-        socklen_t len = sizeof(error);
-        getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
-        if (error != 0) {
-            // Connection failed
-            results[i].port = i;
-            results[i].is_open = false;
+        if (recv_len < 0) {
+            if (errno != EWOULDBLOCK) {
+                perror("ERROR receiving datagram");
+            }
         } else {
-            // Connection successful
-            printf("Port %d is open\n", i);
-            results[i].port = i;
-            results[i].is_open = true;
+            // Vérifier le type de réponse (UDP ou ICMP)
+            if (src_addr.sin_port == htons(i)) {
+                // Réponse UDP, le port est ouvert
+                results[i].port = i;
+                results[i].is_open = true;
 
-            // Ajouter les informations sur le port ouvert à la chaîne de caractères
-            char port_info_str[50];
-            sprintf(port_info_str, "Port %d\n", i);
-            strcat(buffer, port_info_str);
+                // Ajouter les informations sur le port ouvert à la chaîne de caractères
+                char port_info_str[50];
+                sprintf(port_info_str, "Port %d\n", i);
+                strcat(buffer, port_info_str);
+            } else {
+                // Réponse ICMP, le port est fermé
+                printf("Port %d is closed\n", i);
+            }
         }
-
-        close(sockfd);
     }
+
+    close(sockfd);
 
     if(too_long) { // Si le temps d'attente est trop long
         strcat(buffer, "Timeout\n");
         printf("Attente trop longue\n");
-    } else if (strlen(buffer) == 0) { // Si aucun port n'est ouvert 
+    } else if (strlen(buffer) == 0) { // Si aucun port n'est ouvert
         strcat(buffer, "Aucun port ouvert.\n");
         printf("Aucun port ouvert.\n");
     } else { // Afficher les ports ouverts
         printf("Ports ouverts :\n%s\n", buffer);
     }
 }
+
 
 
 void handleClientRequest(char *request, char *response) {
@@ -116,7 +102,7 @@ void handleClientRequest(char *request, char *response) {
             // si la requête est "2", alors la deuxième lettre est l'adresse IP
             // donc on prend la deuxième lettre jusqu'à la fin de la chaîne
             strcpy(ip_address, request + 1);
-            scan_vertical(ip_address, 1, 1024, response);
+            scan_vertical_UDP(ip_address, 1, 1024, response);
             free(ip_address);
             break;
         case 3:
