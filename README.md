@@ -25,9 +25,29 @@ Pour envoyer des informations du serveur au client on envoie sous la forme :
 
     Serveur envoie : donnée (pas de mise en forme particulière)  
     Client lit la donnée et l'affiche.
+
 ## Scanner horizontal
 
+Ce scanner horizontal effectue un balayage des adresses IP actives dans le réseau local. Il scanne toutes les adresses dans la plage définie par l'adresse du réseau et l'adresse de diffusion (broadcast) pour chaque interface réseau active qui n'est pas de type loopback. Le scan s'appuie sur des paquets ICMP pour déterminer si une hôte est actif ou non.
 
+### Détecter les adresses réseau (coté client)
+
+Le programme commence par récupérer la liste des interfaces réseau disponibles. Pour chaque interface de type IPv4 qui n'est pas une interface loopback :
+
+L'adresse IP et le masque de sous-réseau de l'interface sont affichés.
+L'adresse réseau et l'adresse de diffusion sont calculées à partir de l'adresse IP de l'interface et du masque de sous-réseau.
+
+### Balayage des adresses (coté client)
+
+Le client exécute ensuite le scan sur la plage d'adresses définie entre l'adresse du réseau et l'adresse de diffusion. Il utilise la fonction is_host_active pour envoyer des requêtes ICMP (type Echo) et attend une réponse pour chaque adresse IP dans la plage. Chaque adresse IP répondant positivement est considérée comme active.
+
+Pour chaque adresse détectée comme active, l'information est affichée sur la console.
+En cas d'échec de réponse (timeout), l'adresse est considérée comme inactive.
+Des contrôles d'erreur sont effectués pour s'assurer que les interfaces réseau peuvent être correctement analysées et que les adresses IP peuvent être balayées sans interruption. Les erreurs potentielles dans la création de sockets ou pendant l'envoi et la réception de paquets ICMP sont gérées et des messages appropriés sont affichés.
+
+### Fermeture de la session de scan
+
+Une fois le scan terminé, toutes les ressources réseau utilisées, telles que les sockets et les structures d'information d'interface, sont libérées pour éviter les fuites de mémoire et garantir que le programme se termine proprement.
 
 ## Scanner vertical
 

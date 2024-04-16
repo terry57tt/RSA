@@ -28,7 +28,7 @@ unsigned short checksum(void *b, int len) {
 }
 
 // Fonction pour vérifier si un hôte est actif en utilisant ICMP.
-int is_host_active(const char* ip_address) {
+int is_host_active(const char* ip_address, char *buffer) {
     int sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (sockfd < 0) {
         perror("socket");
@@ -87,7 +87,7 @@ void calculateBroadcastAddress(struct in_addr networkAddress, struct in_addr mas
     broadcastAddress->s_addr = networkAddress.s_addr | ~mask.s_addr;
 }
 
-void scan_horizontal() {
+void scan_horizontal(char *buffer) {
     struct ifaddrs *ifap, *ifa;
     struct sockaddr_in *sa;
     char gateway_ip[INET_ADDRSTRLEN];
@@ -132,10 +132,10 @@ void scan_horizontal() {
                     for (unsigned int i = ntohl(networkAddress.s_addr) + 1; i < ntohl(broadcastAddress.s_addr); i++) {
                         struct in_addr currentAddress;
                         currentAddress.s_addr = htonl(i);
-                        if (is_host_active(inet_ntoa(currentAddress))) {
+                        if (is_host_active(inet_ntoa(currentAddress), buffer)) {
                             printf("Host %s is active.\n", inet_ntoa(currentAddress));
                         }
-                        //Voir si ca marche pas mon IP : 
+                        //Voir si ca marche avec mon IP : 
                         // if (is_host_active(ip_address)) {
                         //     printf("Host %s is active.\n", ip_address);
                         // }
@@ -149,7 +149,8 @@ void scan_horizontal() {
     freeifaddrs(ifap);
 }
 
-int main() {
-    scan_horizontal();
-    return 0;
-}
+// int main() {
+//     char buffer[1024] = {0};
+//     scan_horizontal(buffer);
+//     return 0;
+// }
