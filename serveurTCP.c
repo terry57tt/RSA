@@ -10,6 +10,7 @@
 #include <sys/select.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <scan_horiz.c>
 
 #define PORT 8080
 
@@ -112,7 +113,8 @@ void handleClientRequest(char *request, char *response) {
 
     switch(atoi(&first_letter)) {
         case 1:
-            strcpy(response, "SCAN_H\n");
+            scan_horizontal(response);
+            strcat(response, "Scan horizontal terminé.\n");
             break;
         case 2:
             // si la requête est "2", alors la deuxième lettre est l'adresse IP

@@ -66,12 +66,9 @@ int is_host_active(const char* ip_address, char *buffer) {
     socklen_t len = sizeof(response_addr);
     if (recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&response_addr, &len) > 0) {
         // Additional check here for ICMP echo reply could be implemented
-        printf("Host %s is active.\n", ip_address);
         close(sockfd);
         return 1;
     }
-
-    printf("Host %s is inactive or the request timed out.\n", ip_address);
     close(sockfd);
     return 0;
 }
@@ -94,6 +91,7 @@ void scan_horizontal(char *buffer) {
     struct in_addr mask;
     struct in_addr networkAddress;
     struct in_addr broadcastAddress;
+    char message[1024];
 
     // Récupère la liste des interfaces réseau
     if (getifaddrs(&ifap) != 0) {
@@ -107,6 +105,7 @@ void scan_horizontal(char *buffer) {
         if (ifa->ifa_addr != NULL && ifa->ifa_addr->sa_family == AF_INET) {
             sa = (struct sockaddr_in *)ifa->ifa_addr;
 
+
             // Exclut les interfaces loopback (adresse IP locale)
             if (strcmp(inet_ntoa(sa->sin_addr), "127.0.0.1") != 0) {
                 // Convertit l'adresse IP binaire en une chaîne de caractères lisible
@@ -115,25 +114,48 @@ void scan_horizontal(char *buffer) {
 
                 // Si l'interface a une adresse IP, affiche-la
                 if (ip_address != NULL) {
+
+                    sprintf(message, "Interface: %s\n", ifa->ifa_name);
+                    strcat(buffer, message);
+
+                    sprintf(message, "IP Address: %s\n", ip_address);
+                    strcat(buffer, message);
+
+                    sprintf(message, "Subnet Mask: %s\n", inet_ntoa(mask));
+                    strcat(buffer, message);
+
                     printf("Interface: %s\n", ifa->ifa_name);
                     printf("IP Address: %s\n", ip_address);
                     printf("Subnet Mask: %s\n", inet_ntoa(mask));
 
                     // Calculer l'adresse du réseau
                     calculateNetworkAddress(sa->sin_addr, mask, &networkAddress);
+                    sprintf(message, "Network Address: %s\n", inet_ntoa(networkAddress));
+                    strcat(buffer, message);
                     printf("Network Address: %s\n", inet_ntoa(networkAddress));
 
                     // Calculer l'adresse de diffusion
                     calculateBroadcastAddress(networkAddress, mask, &broadcastAddress);
+                    sprintf(message, "Broadcast Address: %s\n", inet_ntoa(broadcastAddress));
+                    strcat(buffer, message);
                     printf("Broadcast Address: %s\n", inet_ntoa(broadcastAddress));
                     
                     // Scan réseau : Boucle à travers toutes les adresses IP du réseau
+                    sprintf(message, "Scanning IP: %s\n", ip_address);
+                    strcat(buffer, message);
                     printf("Scanning Network...\n");
                     for (unsigned int i = ntohl(networkAddress.s_addr) + 1; i < ntohl(broadcastAddress.s_addr); i++) {
                         struct in_addr currentAddress;
                         currentAddress.s_addr = htonl(i);
                         if (is_host_active(inet_ntoa(currentAddress), buffer)) {
+                            snprintf(message, 256, "Host %s is active.\n", inet_ntoa(currentAddress));
+                            strcat(buffer, message);
                             printf("Host %s is active.\n", inet_ntoa(currentAddress));
+                        }
+                        else {
+                            snprintf(message, 256, "Host %s is inactive.\n", inet_ntoa(currentAddress));
+                            strcat(buffer, message);
+                            printf("Host %s is inactive or the request timeout.\n", inet_ntoa(currentAddress));
                         }
                         //Voir si ca marche avec mon IP : 
                         // if (is_host_active(ip_address)) {

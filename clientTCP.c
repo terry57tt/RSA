@@ -62,7 +62,7 @@ bool displayMenu(char *buffer, char *ip_address, int sock) {
 
 int main() {
     struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
+    char buffer[16384] = {0};
     int sock = 0;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
